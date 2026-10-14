@@ -1,65 +1,27 @@
-## Install netcat
+# COS3105 Mini Project — Server Core Study Draft
 
-```bash
-sudo apt update
-sudo apt install netcat-openbsd
-```
+This directory is a reviewable draft built to follow the teacher's existing architecture and complete only the stated Board/Task requirements before TUI work.
 
-## Test Model
+Read in this order:
+
+1. `CHANGELOG_SERVER_CORE.md` — design and reasons
+2. `src/protocol.h` — protocol vocabulary/status
+3. `src/models.h` / `src/models.c` — data operations
+4. `src/server.h` / `src/server.c` — server workflow/handlers
+5. `src/tests/test_models.c` — Model unit tests
+6. `TEST_COMMANDS.md` — netcat + C client tests
+7. `client.c` — minimal client core before TUI
+
+Build/test:
 
 ```bash
 ./run_test.sh test_models
-```
-
-## Run Server
-
-```bash
 ./run_server.sh
 ```
 
-
-### List of Commands
-
-- ADD_BOARD      
-- ADD_TASK      
-
-### List of STATUS
-
-- 0xXX: Success & Basic
-    - STATUS_OK = 0
-    - STATUS_FAIL = 1
-    - STATUS_UNKNOWN = 3
-
-- 2xXX: Client/Request Errors (200+)
-    - STATUS_INVALID_ARGUMENTS = 200
-    - STATUS_BOARD_NOT_FOUND = 201
-    - STATUS_EMPTY_BOARD = 202
-    - STATUS_TASK_NOT_FOUND = 203
-    - STATUS_EMPTY_TASK = 204
-
-- 5xXX: Server/System Errors (500+)
-    - STATUS_SAVE_BOARD_FAIL = 500
-    - STATUS_ADD_BOARD_FAIL = 501
-    - STATUS_SAVE_TASK_FAIL = 502
-    - STATUS_ADD_TASK_FAIL = 503
-
-
-## Test API
-
-### Add board
-
-- If success return 0
+In another terminal:
 
 ```bash
-echo "ADD_BOARD,Board 1\n" | nc 127.0.0.1 3030
-ADD_BOARD,0
-```
-
-### Add task
-
-- If success return 0
-
-```bash
-echo "ADD_TASK,Task 1\n" | nc 127.0.0.1 3030
-ADD_TASK,0
+./run_client.sh
+./client LIST_BOARD
 ```

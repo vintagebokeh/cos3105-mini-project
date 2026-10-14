@@ -11,6 +11,20 @@ SOCKET socket_listen = -1;
 Project *project = NULL;
 sem_t *sem = NULL;
 
+/*
+ * Helper เล็ก ๆ สำหรับส่ง response หนึ่งบรรทัด
+ * ยังใช้ send() ตามแนวทางเดิมของอาจารย์ ไม่เพิ่ม protocol layer ใหม่เกิน requirement
+ */
+static void sendLine(SOCKET clientSocket, const char *text)
+{
+  send(clientSocket, text, strlen(text), 0);              // ส่งข้อความตามความยาว string
+}
+
+/* ================================================================
+ * BOARD: ADD_BOARD
+ * baseline ของอาจารย์ + แยก status ของ add/save ให้ชัดขึ้น
+ * ================================================================ */
+
 void handleAddBoard(CommandContext *ctx)
 {
   char *boardTitle = strtok_r(NULL, COMMAND_SEPARATOR, &ctx->rawInput);
@@ -29,7 +43,10 @@ void handleAddBoard(CommandContext *ctx)
 
     // 2. CRITICAL SECTION: Only one process can be here at a time
     int result = addBoard(ctx->project, boardTitle);
+    int saveResult = 0;                                                   // เตรียมผลการ save
+
     saveBoard(ctx->project, BOARD_FILENAME);
+
     // 3. Release the lock
     sem_post(sem);
     if (result == 0)

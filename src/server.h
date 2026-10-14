@@ -45,9 +45,17 @@ typedef struct {
 
 
 // Server
-void handleAddBoard(CommandContext *ctx);
-void handleAddTask(CommandContext *ctx);
+/* ----- Board handlers ----- */
+void handleAddBoard(CommandContext *ctx);       // baseline + ปรับ status ให้ชัดขึ้น
+void handleListBoard(CommandContext *ctx);      // [ADDED] requirement: List board
+void handleUpdateBoard(CommandContext *ctx);    // [ADDED] requirement: Update board
+void handleDeleteBoard(CommandContext *ctx);    // [ADDED] requirement: Delete board
 
+/* ----- Task handlers ----- */
+void handleAddTask(CommandContext *ctx);        // baseline + ปรับ status ให้ชัดขึ้น
+void handleListTask(CommandContext *ctx);       // [ADDED] requirement: List task from boardId
+void handleUpdateTask(CommandContext *ctx);     // [ADDED] requirement: Update task
+void handleDeleteTask(CommandContext *ctx);     // [ADDED] requirement: Delete task
 
 // Common
 int handleClient(SOCKET socket_client,char *read);
