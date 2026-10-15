@@ -1,4 +1,5 @@
 #include "common.h"
+#include "protocol.h"
 
 int isEmptyOrSpace(const char *str) 
 {
@@ -103,4 +104,32 @@ int fileExists(const char *filename)
     }
     
     return 1;
+}
+
+const char *statusName(int status)
+{
+    switch (status)
+    {
+        case STATUS_OK:                return "OK";
+        case STATUS_FAIL:              return "FAIL";
+        case STATUS_UNKNOWN:           return "UNKNOWN_COMMAND";
+
+        case STATUS_INVALID_ARGUMENTS: return "INVALID_ARGUMENTS";
+        case STATUS_BOARD_NOT_FOUND:   return "BOARD_NOT_FOUND";
+        case STATUS_EMPTY_BOARD:       return "EMPTY_BOARD";
+        case STATUS_TASK_NOT_FOUND:    return "TASK_NOT_FOUND";
+        case STATUS_EMPTY_TASK:        return "EMPTY_TASK";
+
+        case STATUS_SAVE_BOARD_FAIL:   return "SAVE_BOARD_FAIL";
+        case STATUS_ADD_BOARD_FAIL:    return "ADD_BOARD_FAIL";
+        case STATUS_SAVE_TASK_FAIL:    return "SAVE_TASK_FAIL";
+        case STATUS_ADD_TASK_FAIL:     return "ADD_TASK_FAIL";
+
+        case STATUS_UPDATE_BOARD_FAIL: return "UPDATE_BOARD_FAIL";
+        case STATUS_DELETE_BOARD_FAIL: return "DELETE_BOARD_FAIL";
+        case STATUS_UPDATE_TASK_FAIL:  return "UPDATE_TASK_FAIL";
+        case STATUS_DELETE_TASK_FAIL:  return "DELETE_TASK_FAIL";
+
+        default:                       return "UNKNOWN_STATUS";
+    }
 }

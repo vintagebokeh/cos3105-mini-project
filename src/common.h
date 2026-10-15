@@ -6,6 +6,7 @@
 #include <ctype.h>
 #include <sys/file.h>
 
+const char *statusName(int status);
 char* replace_char(char* str, char find, char replace);
 int isNumeric(const char *str);
 int isFloat(const char *str);
