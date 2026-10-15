@@ -63,6 +63,7 @@ typedef enum {
     STATUS_DELETE_BOARD_FAIL = 505,
     STATUS_UPDATE_TASK_FAIL = 506,
     STATUS_DELETE_TASK_FAIL = 507,
+    STATUS_SAVE_BOARD_AND_TASK_FAIL = 508,
 } ResponseStatus;
 
 #endif

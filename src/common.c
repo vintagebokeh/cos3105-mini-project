@@ -129,6 +129,7 @@ const char *statusName(int status)
         case STATUS_DELETE_BOARD_FAIL: return "DELETE_BOARD_FAIL";
         case STATUS_UPDATE_TASK_FAIL:  return "UPDATE_TASK_FAIL";
         case STATUS_DELETE_TASK_FAIL:  return "DELETE_TASK_FAIL";
+        case STATUS_SAVE_BOARD_AND_TASK_FAIL: return "SAVE_BOARD_AND_TASK_FAIL";
 
         default:                       return "UNKNOWN_STATUS";
     }

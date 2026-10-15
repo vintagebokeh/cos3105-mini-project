@@ -167,18 +167,17 @@ void handleUpdateBoard(CommandContext *ctx)
 {
   char *boardId = strtok_r(NULL, COMMAND_SEPARATOR, &ctx->rawInput);
   char *boardTitle = strtok_r(NULL, COMMAND_SEPARATOR, &ctx->rawInput);
-  strlen(boardTitle) >= BOARD_TITLE_SIZE;
-  char response[MESSAGE_SIZE];
 
-  if (isEmptyOrSpace(boardId) || isEmptyOrSpace(boardTitle))
+  char response[MESSAGE_SIZE];
+  int status = STATUS_OK;
+
+  if (isEmptyOrSpace(boardId) || isEmptyOrSpace(boardTitle) || strlen(boardTitle) >= BOARD_TITLE_SIZE)
   {
-    snprintf(response, sizeof(response), "%s%s%d\n", COMMAND_UPDATE_BOARD, COMMAND_SEPARATOR, STATUS_INVALID_ARGUMENTS);
-    send(ctx->clientSocket, response, strlen(response), 0);
+    status = STATUS_INVALID_ARGUMENTS;
   }
   else
   {
-    int status = STATUS_OK;
-
+  
     if (sem_wait(sem) == -1)
     {
         status = STATUS_FAIL;
@@ -209,13 +208,81 @@ void handleUpdateBoard(CommandContext *ctx)
                 }
             }
         }
-        snprintf(response, sizeof(response), "%s%s%d%s%s\n", COMMAND_UPDATE_BOARD,
-        COMMAND_SEPARATOR, status, COMMAND_SEPARATOR, statusName(status));
-        sendLine(ctx->clientSocket, response);
-                
+
         sem_post(sem);
     }
   }
+  snprintf(response, sizeof(response), "%s%s%d%s%s\n", COMMAND_UPDATE_BOARD,
+  COMMAND_SEPARATOR, status, COMMAND_SEPARATOR, statusName(status));
+  sendLine(ctx->clientSocket, response);
+}
+
+/* ================================================================
+ * BOARD: Delete_BOARD
+ * baseline ของอาจารย์ 
+ * ================================================================ */
+
+void handleDeleteBoard(CommandContext *ctx)
+{
+  char *boardId = strtok_r(NULL, COMMAND_SEPARATOR, &ctx->rawInput);
+
+  char response[MESSAGE_SIZE];
+  int status = STATUS_OK;
+
+
+  if (isEmptyOrSpace(boardId))
+  {
+    status = STATUS_INVALID_ARGUMENTS;
+  }
+  else
+  {
+  
+    if (sem_wait(sem) == -1)
+    {
+        status = STATUS_FAIL;
+
+    }
+    else
+    {
+        if (hasBoard(ctx->project, boardId) == NULL)
+        {
+            status = STATUS_BOARD_NOT_FOUND;
+
+        }
+        else
+        {
+             
+          int result = deleteBoard(ctx->project, boardId);
+
+            if (result != 0)
+            {
+                status = STATUS_DELETE_BOARD_FAIL;
+            }
+            else
+            {
+              int saveBoardResult = saveBoard(ctx->project, BOARD_FILENAME);
+              int saveTaskResult = saveAllTasks(ctx->project, TASK_FILENAME);
+              if (saveBoardResult != 0 && saveTaskResult != 0)
+              {
+                status = STATUS_SAVE_BOARD_AND_TASK_FAIL;
+              }
+              else if (saveBoardResult != 0)
+              {
+                status = STATUS_SAVE_BOARD_FAIL;
+              }
+              else if (saveTaskResult != 0)
+              {
+                status = STATUS_SAVE_TASK_FAIL;
+              }
+            }
+        }
+
+        sem_post(sem);
+    }
+  }
+  snprintf(response, sizeof(response), "%s%s%d%s%s\n", COMMAND_DELETE_BOARD,
+  COMMAND_SEPARATOR, status, COMMAND_SEPARATOR, statusName(status));
+  sendLine(ctx->clientSocket, response);
 }
 
 void handleAddTask(CommandContext *ctx)
@@ -283,6 +350,7 @@ int handleClient(SOCKET socket_client, char *read)
       {COMMAND_ADD_BOARD, handleAddBoard},
       {COMMAND_LIST_BOARD, handleListBoard},
       {COMMAND_UPDATE_BOARD, handleUpdateBoard},
+      {COMMAND_DELETE_BOARD, handleDeleteBoard},
       {COMMAND_ADD_TASK, handleAddTask},
       {NULL, NULL} // Sentinel to mark the end
   };
