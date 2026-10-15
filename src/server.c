@@ -54,38 +54,49 @@ void handleAddBoard(CommandContext *ctx)
   char *boardTitle = strtok_r(NULL, COMMAND_SEPARATOR, &ctx->rawInput);
 
   char response[MESSAGE_SIZE];
+  int status = STATUS_OK;
 
-  if (isEmptyOrSpace(boardTitle))
+  // 1. Validate Arguments
+  if (isEmptyOrSpace(boardTitle) || strlen(boardTitle) >= BOARD_TITLE_SIZE)
   {
-    snprintf(response, sizeof(response), "%s%s%d\n", COMMAND_ADD_BOARD, COMMAND_SEPARATOR, STATUS_INVALID_ARGUMENTS);
-    send(ctx->clientSocket, response, strlen(response), 0);
+    status = STATUS_INVALID_ARGUMENTS;
   }
   else
   {
-    // 1. Wait for the lock (Block if another process is buying)
-    sem_wait(sem);
-
-    // 2. CRITICAL SECTION: Only one process can be here at a time
-    int result = addBoard(ctx->project, boardTitle);
-    int saveResult = 0;                                                   // เตรียมผลการ save
-
-    saveBoard(ctx->project, BOARD_FILENAME);
-
-    // 3. Release the lock
-    sem_post(sem);
-    if (result == 0)
+    // 2. Wait for the lock (Block if another process is buying) Lock Shared Memory
+    if (sem_wait(sem) == -1)
     {
-      snprintf(response, sizeof(response), "%s%s%d\n", COMMAND_ADD_BOARD, COMMAND_SEPARATOR, STATUS_OK);
-      send(ctx->clientSocket, response, strlen(response), 0);
+      status = STATUS_FAIL;
     }
     else
     {
-      snprintf(response, sizeof(response), "%s%s%d\n", COMMAND_ADD_BOARD, COMMAND_SEPARATOR, STATUS_FAIL);
-      send(ctx->clientSocket, response, strlen(response), 0);
+      // 3. Add Board
+      int result = addBoard(ctx->project, boardTitle);
+          
+      if (result != 0)
+      {
+        status = STATUS_ADD_BOARD_FAIL;
+      }
+      else 
+      {
+        // 4. Save only when Add succeeds
+        int saveResult = saveBoard(ctx->project, BOARD_FILENAME);
+
+        if (saveResult != 0)
+        {
+          status = STATUS_SAVE_BOARD_FAIL;
+        }
+      }
+    
+      // 3. Release the lock
+      sem_post(sem);
     }
   }
+  // 6. Single Response Point
+  snprintf(response, sizeof(response), "%s%s%d%s%s\n", COMMAND_ADD_BOARD,
+  COMMAND_SEPARATOR, status, COMMAND_SEPARATOR, statusName(status));
+  sendLine(ctx->clientSocket, response);
 }
-
 
 void handleListBoard(CommandContext *ctx)
 {
