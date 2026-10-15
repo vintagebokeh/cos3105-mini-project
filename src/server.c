@@ -153,7 +153,9 @@ void handleListBoard(CommandContext *ctx)
     }
 
     // 7. จบ Response
-    sendLine(ctx->clientSocket, "END\n");
+    snprintf(response, sizeof(response),
+         "%s\n", RESPONSE_END);
+    sendLine(ctx->clientSocket, response);
 }
 
 /* ================================================================
@@ -165,7 +167,7 @@ void handleUpdateBoard(CommandContext *ctx)
 {
   char *boardId = strtok_r(NULL, COMMAND_SEPARATOR, &ctx->rawInput);
   char *boardTitle = strtok_r(NULL, COMMAND_SEPARATOR, &ctx->rawInput);
-
+  strlen(boardTitle) >= BOARD_TITLE_SIZE;
   char response[MESSAGE_SIZE];
 
   if (isEmptyOrSpace(boardId) || isEmptyOrSpace(boardTitle))
@@ -180,15 +182,14 @@ void handleUpdateBoard(CommandContext *ctx)
     if (sem_wait(sem) == -1)
     {
         status = STATUS_FAIL;
+
     }
     else
     {
         if (hasBoard(ctx->project, boardId) == NULL)
         {
             status = STATUS_BOARD_NOT_FOUND;
-            snprintf(response, sizeof(response), "%s%s%d%s%s\n", COMMAND_UPDATE_BOARD,
-            COMMAND_SEPARATOR, status, COMMAND_SEPARATOR, statusName(status));
-            sendLine(ctx->clientSocket, response);
+
         }
         else
         {
@@ -197,9 +198,6 @@ void handleUpdateBoard(CommandContext *ctx)
             if (result != 0)
             {
                 status = STATUS_UPDATE_BOARD_FAIL;
-                snprintf(response, sizeof(response), "%s%s%d%s%s\n", COMMAND_UPDATE_BOARD,
-                COMMAND_SEPARATOR, status, COMMAND_SEPARATOR, statusName(status));
-                sendLine(ctx->clientSocket, response);
             }
             else
             {
@@ -208,13 +206,13 @@ void handleUpdateBoard(CommandContext *ctx)
                 if (saveResult != 0)
                 {
                     status = STATUS_SAVE_BOARD_FAIL;
-                    snprintf(response, sizeof(response), "%s%s%d%s%s\n", COMMAND_UPDATE_BOARD,
-                    COMMAND_SEPARATOR, status, COMMAND_SEPARATOR, statusName(status));
-                    sendLine(ctx->clientSocket, response);
                 }
             }
         }
-        
+        snprintf(response, sizeof(response), "%s%s%d%s%s\n", COMMAND_UPDATE_BOARD,
+        COMMAND_SEPARATOR, status, COMMAND_SEPARATOR, statusName(status));
+        sendLine(ctx->clientSocket, response);
+                
         sem_post(sem);
     }
   }
@@ -284,6 +282,7 @@ int handleClient(SOCKET socket_client, char *read)
   CommandEntry commandTable[] = {
       {COMMAND_ADD_BOARD, handleAddBoard},
       {COMMAND_LIST_BOARD, handleListBoard},
+      {COMMAND_UPDATE_BOARD, handleUpdateBoard},
       {COMMAND_ADD_TASK, handleAddTask},
       {NULL, NULL} // Sentinel to mark the end
   };
