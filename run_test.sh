@@ -1,12 +1,26 @@
+
 #!/usr/bin/env bash
+set -euo pipefail
 
-# Strip .c extension if it was passed (e.g. test_models.c -> test_models)
-TEST_NAME="${1%.c}"
+TEST_NAME="${1:-test_models}"
+TEST_NAME="${TEST_NAME%.c}"
 
-# Compile all necessary source files
-gcc -I./src "src/tests/${TEST_NAME}.c" src/models.c src/common.c -o "$TEST_NAME"
+REPO_DIR="$PWD"
+TEST_DIR="$(mktemp -d)"
+trap 'rm -rf "$TEST_DIR"' EXIT
 
-# Run only if compilation succeeded
-if [ $? -eq 0 ]; then
+echo "Compiling $TEST_NAME..."
+
+gcc -Wall -Wextra -I./src \
+    "src/tests/${TEST_NAME}.c" \
+    src/models.c src/common.c \
+    -o "$TEST_DIR/$TEST_NAME"
+
+echo "Running tests in isolated directory..."
+
+(
+    cd "$TEST_DIR"
     "./$TEST_NAME"
-fi
+)
+
+echo "TEST COMPLETED"
