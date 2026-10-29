@@ -21,15 +21,29 @@ int main(){
     assert(project != NULL);                                             // ต้องจอง memory สำเร็จ
 
     /* ----- Create Board ----- */
+    printf("เพิ่ม Board 1\n");
     assert(addBoard(project, "Board 1") == 0);                          // เพิ่ม Board 1
+    printf("เพิ่ม Board ID %s สำเร็จ | จำนวน Board: %d\n",
+       project->boards[1].boardId,
+       project->totalBoards);
+    printf("เพิ่ม Board 2\n");
     assert(addBoard(project, "Board 2") == 0);                          // เพิ่ม Board 2
+    printf("เพิ่ม Board ID %s สำเร็จ | จำนวน Board: %d\n",
+       project->boards[1].boardId,
+       project->totalBoards);
     assert(project->totalBoards == 2);                                  // ต้องมี 2 Board
     assert(strcmp(project->boards[0].boardTitle, "Board 1") == 0);      // ตรวจ title Board 1
+    printf("Total Board(s): %d\n",project->totalBoards);
 
     /* ----- Create Task ----- */
+    printf("เพิ่ม Task 1\n");
     assert(addTask(&project->boards[0], "Task 1") == 0);                // เพิ่ม Task 1 ใน Board 1
+    printf("เพิ่ม Task 2\n");
     assert(addTask(&project->boards[0], "Task 2") == 0);                // เพิ่ม Task 2 ใน Board 1
     assert(project->boards[0].totalTasks == 2);                          // Board 1 ต้องมี 2 Task
+    printf("Board ID %s มี Task ทั้งหมด %d รายการ\n",
+       project->boards[0].boardId,
+       project->boards[0].totalTasks);
 
     /* ----- Update Board ----- */
     assert(updateBoard(project, "1", "Board 1 Updated") == 0);          // แก้ Board 1

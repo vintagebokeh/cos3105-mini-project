@@ -298,47 +298,172 @@ void handleDeleteBoard(CommandContext *ctx)
 
 void handleAddTask(CommandContext *ctx)
 {
-    char *boardId = strtok_r(NULL, COMMAND_SEPARATOR, &ctx->rawInput);
-    char *taskTitle = strtok_r(NULL, COMMAND_SEPARATOR, &ctx->rawInput);
-
+    char *boardId = strtok_r(NULL, ",\r\n", &ctx->rawInput);
+    char *taskTitle = strtok_r(NULL, ",\r\n", &ctx->rawInput);
     char response[MESSAGE_SIZE];
+    int status = STATUS_OK;
 
-    if (boardId == NULL || taskTitle == NULL ||
-        isEmptyOrSpace(boardId) || isEmptyOrSpace(taskTitle))
-    {
-        snprintf(response, sizeof(response), "%s%s%d\n", COMMAND_ADD_TASK, COMMAND_SEPARATOR, STATUS_INVALID_ARGUMENTS);
-        send(ctx->clientSocket, response, strlen(response), 0);
-        return;
-    }
-
-    Board *board = hasBoard(ctx->project, boardId);
-
-    if (board == NULL)
-    {
-        snprintf(response, sizeof(response), "%s%s%d\n", COMMAND_ADD_TASK, COMMAND_SEPARATOR, STATUS_BOARD_NOT_FOUND);
-        send(ctx->clientSocket, response, strlen(response), 0);
-        return;
-    }
-
-    // 1. Wait for the lock
-    sem_wait(sem);
-
-    // 2. CRITICAL SECTION
-    int result = addTask(board, taskTitle);
-    saveAllTasks(ctx->project, TASK_FILENAME);
-
-    // 3. Release the lock
-    sem_post(sem);
-
-    if (result == 0)
-    {
-        snprintf(response, sizeof(response), "%s%s%d\n", COMMAND_ADD_TASK, COMMAND_SEPARATOR, STATUS_OK);
-    }
+    /* 1. Validate before touching shared memory. */
+    if (!boardId || !taskTitle || isEmptyOrSpace(boardId) ||
+        isEmptyOrSpace(taskTitle) || strlen(boardId) >= BOARDID_SIZE ||
+        strlen(taskTitle) >= TASK_TITLE_SIZE)
+        status = STATUS_INVALID_ARGUMENTS;
+    /* 2. A failed wait means no lock was acquired. */
+    else if (sem_wait(sem) == -1)
+        status = STATUS_FAIL;
     else
     {
-        snprintf(response, sizeof(response), "%s%s%d\n", COMMAND_ADD_TASK, COMMAND_SEPARATOR, STATUS_FAIL);
+        /* 3. Find board and modify shared memory under the same lock. */
+        Board *board = hasBoard(ctx->project, boardId);
+        if (!board)
+            status = STATUS_BOARD_NOT_FOUND;
+        else
+        {
+            /* 4. Save only when addTask succeeded. */
+            int result = addTask(board, taskTitle);
+            int save_result = -1;
+            if (result == 0)
+                save_result = saveAllTasks(ctx->project, TASK_FILENAME);
+            if (result != 0)
+                status = STATUS_ADD_TASK_FAIL;
+            else if (save_result != 0)
+                status = STATUS_SAVE_TASK_FAIL;
+        }
+        /* 5. Exactly one unlock on all paths that acquired the lock. */
+        if (sem_post(sem) == -1)
+            status = STATUS_FAIL;
     }
-    send(ctx->clientSocket, response, strlen(response), 0);
+    /* 6. Send exactly one response, after releasing the lock. */
+    snprintf(response, sizeof(response), "%s%s%d\n",
+             COMMAND_ADD_TASK, COMMAND_SEPARATOR, status);
+    sendLine(ctx->clientSocket, response);
+}
+
+
+/* TASK: Read task records, then send snapshot after unlocking. */
+void handleListTask(CommandContext *ctx)
+{
+    char *boardId = strtok_r(NULL, ",\r\n", &ctx->rawInput);
+    char ids[MAX_TASK][TASKID_SIZE];
+    char titles[MAX_TASK][TASK_TITLE_SIZE];
+    int finished[MAX_TASK];
+    char response[MESSAGE_SIZE];
+    int count = 0;
+    int status = STATUS_OK;
+
+    if (!boardId || isEmptyOrSpace(boardId) || strlen(boardId) >= BOARDID_SIZE)
+        status = STATUS_INVALID_ARGUMENTS;
+    else if (sem_wait(sem) == -1)
+        status = STATUS_FAIL;
+    else
+    {
+        Board *board = hasBoard(ctx->project, boardId);
+        if (!board)
+            status = STATUS_BOARD_NOT_FOUND;
+        else if (board->totalTasks < 0 || board->totalTasks > MAX_TASK)
+            status = STATUS_FAIL;
+        else
+        {
+            count = board->totalTasks;
+            for (int i = 0; i < count; ++i)
+            {
+                snprintf(ids[i], sizeof(ids[i]), "%s", board->tasks[i].taskId);
+                snprintf(titles[i], sizeof(titles[i]), "%s", board->tasks[i].taskTitle);
+                finished[i] = board->tasks[i].isFinish;
+            }
+            if (count == 0)
+                status = STATUS_EMPTY_TASK;
+        }
+        if (sem_post(sem) == -1)
+        {
+            status = STATUS_FAIL;
+            count = 0;
+        }
+    }
+
+    snprintf(response, sizeof(response), "%s,%d,%d\n",
+             COMMAND_LIST_TASK, status, count);
+    if (sendLine(ctx->clientSocket, response) == -1)
+        return;
+    if (status == STATUS_OK)
+    {
+        for (int i = 0; i < count; ++i)
+        {
+            snprintf(response, sizeof(response), "%s,%s,%s,%d\n",
+                     RECORD_TASK, ids[i], titles[i], finished[i]);
+            if (sendLine(ctx->clientSocket, response) == -1)
+                return;
+        }
+    }
+    sendLine(ctx->clientSocket, RESPONSE_END "\n");
+}
+
+/* TASK: Update title and persist the task file. */
+void handleUpdateTask(CommandContext *ctx)
+{
+    char *boardId = strtok_r(NULL, ",\r\n", &ctx->rawInput);
+    char *taskId = strtok_r(NULL, ",\r\n", &ctx->rawInput);
+    char *taskTitle = strtok_r(NULL, ",\r\n", &ctx->rawInput);
+    char response[MESSAGE_SIZE];
+    int status = STATUS_OK;
+
+    if (!boardId || !taskId || !taskTitle ||
+        isEmptyOrSpace(boardId) || isEmptyOrSpace(taskId) ||
+        isEmptyOrSpace(taskTitle) || strlen(boardId) >= BOARDID_SIZE ||
+        strlen(taskId) >= TASKID_SIZE || strlen(taskTitle) >= TASK_TITLE_SIZE)
+        status = STATUS_INVALID_ARGUMENTS;
+    else if (sem_wait(sem) == -1)
+        status = STATUS_FAIL;
+    else
+    {
+        if (!hasBoard(ctx->project, boardId))
+            status = STATUS_BOARD_NOT_FOUND;
+        else if (!hasTask(ctx->project, boardId, taskId))
+            status = STATUS_TASK_NOT_FOUND;
+        else if (updateTask(ctx->project, boardId, taskId, taskTitle) != 0)
+            status = STATUS_UPDATE_TASK_FAIL;
+        else if (saveAllTasks(ctx->project, TASK_FILENAME) != 0)
+            status = STATUS_SAVE_TASK_FAIL;
+        if (sem_post(sem) == -1)
+            status = STATUS_FAIL;
+    }
+
+    snprintf(response, sizeof(response), "%s%s%d\n",
+             COMMAND_UPDATE_TASK, COMMAND_SEPARATOR, status);
+    sendLine(ctx->clientSocket, response);
+}
+
+/* TASK: Delete an existing task and persist the task file. */
+void handleDeleteTask(CommandContext *ctx)
+{
+    char *boardId = strtok_r(NULL, ",\r\n", &ctx->rawInput);
+    char *taskId = strtok_r(NULL, ",\r\n", &ctx->rawInput);
+    char response[MESSAGE_SIZE];
+    int status = STATUS_OK;
+
+    if (!boardId || !taskId || isEmptyOrSpace(boardId) ||
+        isEmptyOrSpace(taskId) || strlen(boardId) >= BOARDID_SIZE ||
+        strlen(taskId) >= TASKID_SIZE)
+        status = STATUS_INVALID_ARGUMENTS;
+    else if (sem_wait(sem) == -1)
+        status = STATUS_FAIL;
+    else
+    {
+        if (!hasBoard(ctx->project, boardId))
+            status = STATUS_BOARD_NOT_FOUND;
+        else if (!hasTask(ctx->project, boardId, taskId))
+            status = STATUS_TASK_NOT_FOUND;
+        else if (deleteTask(ctx->project, boardId, taskId) != 0)
+            status = STATUS_DELETE_TASK_FAIL;
+        else if (saveAllTasks(ctx->project, TASK_FILENAME) != 0)
+            status = STATUS_SAVE_TASK_FAIL;
+        if (sem_post(sem) == -1)
+            status = STATUS_FAIL;
+    }
+
+    snprintf(response, sizeof(response), "%s%s%d\n",
+             COMMAND_DELETE_TASK, COMMAND_SEPARATOR, status);
+    sendLine(ctx->clientSocket, response);
 }
 
 int handleClient(SOCKET socket_client, char *read)
@@ -363,6 +488,9 @@ int handleClient(SOCKET socket_client, char *read)
       {COMMAND_UPDATE_BOARD, handleUpdateBoard},
       {COMMAND_DELETE_BOARD, handleDeleteBoard},
       {COMMAND_ADD_TASK, handleAddTask},
+      {COMMAND_LIST_TASK, handleListTask},
+      {COMMAND_UPDATE_TASK, handleUpdateTask},
+      {COMMAND_DELETE_TASK, handleDeleteTask},
       {NULL, NULL} // Sentinel to mark the end
   };
 
