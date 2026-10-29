@@ -1,2 +1,5 @@
 bin/
 obj/
+
+# ไฟล์ผลลัพธ์ทดสอบ Model ไม่ส่งขึ้น Repository
+model_test_run/
